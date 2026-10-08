@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "robot-data-studio"
+version = "0.1.0"
+description = "Local studio for LeRobot datasets"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.34,<1",
+    "lerobot[dataset]",
+]
+
+[project.scripts]
+robot-data-studio = "robot_data_studio.cli:main"
+
+[dependency-groups]
+dev = ["httpx>=0.28,<1", "pytest>=8,<10", "mypy>=1.15,<2", "ruff>=0.11,<1"]
+
+[tool.uv.sources]
+lerobot = { git = "https://github.com/huggingface/lerobot.git", rev = "200ee53596d464bd28f6595cdb31be69a2b5e379" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+files = ["src/robot_data_studio"]
+strict = true
+ignore_missing_imports = true
+follow_imports = "silent"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
