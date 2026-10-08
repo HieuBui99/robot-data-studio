@@ -222,6 +222,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+docs/
+.scratch/
+AGENTS.md
+CLAUDE.md
+
 # Robot Data Studio runtime and frontend dependencies
 /projects/
 /frontend/node_modules/

@@ -11,10 +11,7 @@ uv run --locked robot-data-studio
 ```
 
 This installs the locked Python environment, installs and builds the React
-frontend, then serves everything at **http://127.0.0.1:8000**. The first start
-requires internet access for dependencies. Dataset import itself is local-only.
-LeRobot is pinned to commit `200ee53596d464bd28f6595cdb31be69a2b5e379`;
-its internal APIs are isolated in `lerobot_compat.py`.
+frontend, then serves everything at **http://127.0.0.1:8000**. 
 
 Enter a project name and the local dataset directory containing `meta/info.json`.
 v2.1 imports run LeRobot's converter on a private copy; v3.0 imports copy the
@@ -47,11 +44,6 @@ projects/<project-id>/
   runs/              # augmentation outputs (later tickets)
 ```
 
-Deleting a project removes this directory, including its working copy.
-The source path is never used for deletion. Import failures clean up the
-temporary project, and projects can be reopened after restarting the server.
-The full OrderPicking v2.1 dataset has 200 episodes with incomplete camera
-coverage; importing it keeps 657 complete episodes with all four cameras.
 
 The HTTP API is `POST /api/projects` (`name`, `source_path`),
 `GET /api/projects`, `GET /api/projects/{id}`, and `DELETE /api/projects/{id}`.
