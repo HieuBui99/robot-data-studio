@@ -20,6 +20,12 @@ Enter a project name and the local dataset directory containing `meta/info.json`
 v2.1 imports run LeRobot's converter on a private copy; v3.0 imports copy the
 dataset directly. Import checks the files for every episode and camera, and
 validates the result with `LeRobotDataset` before publishing the project.
+For v2.1 datasets, import skips episodes with missing camera videos, keeps every
+camera for the remaining episodes, and reindexes episode, task and global frame
+indices. Skipped source indices and the mapping back to source episodes are
+recorded in `project.json`; the summary page shows the skipped count and indices.
+Actions, observations, timestamps and camera video bytes for retained episodes
+are preserved. Other invalid files still fail import. v3.0 imports remain strict.
 The source stays unchanged. Full dataset copies need disk space comparable to
 the original; v2.1 conversion temporarily also retains the unconverted copy.
 
@@ -44,8 +50,8 @@ projects/<project-id>/
 Deleting a project removes this directory, including its working copy.
 The source path is never used for deletion. Import failures clean up the
 temporary project, and projects can be reopened after restarting the server.
-Missing camera videos are rejected with the affected path; the full OrderPicking
-dataset contains incomplete episodes, even though the committed test subset is complete.
+The full OrderPicking v2.1 dataset has 200 episodes with incomplete camera
+coverage; importing it keeps 657 complete episodes with all four cameras.
 
 The HTTP API is `POST /api/projects` (`name`, `source_path`),
 `GET /api/projects`, `GET /api/projects/{id}`, and `DELETE /api/projects/{id}`.

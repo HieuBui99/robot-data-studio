@@ -7,6 +7,7 @@ type Project = {
   name: string
   source_path: string
   working_copy: string
+  import_info?: { skipped_episodes?: number[] }
   summary: {
     fps: number
     episode_count: number
@@ -86,6 +87,7 @@ function App() {
         <section>
           <h2>Create a project</h2>
           <p>Import a local LeRobot v2.1 or v3.0 dataset into a separate working copy.</p>
+          <p>For v2.1 datasets, episodes with missing camera videos are skipped.</p>
           <form onSubmit={createProject}>
             <label htmlFor="name">Project name</label>
             <input id="name" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
@@ -107,6 +109,11 @@ function App() {
       <section className="summary">
         {selected ? <>
           <p className="eyebrow">PROJECT SUMMARY</p><h2>{selected.name}</h2>
+          {(selected.import_info?.skipped_episodes?.length ?? 0) > 0 && <details className="import-note">
+            <summary>Skipped {selected.import_info!.skipped_episodes!.length} episodes with missing camera videos</summary>
+            <p>Source episode indices: {selected.import_info!.skipped_episodes!.join(', ')}</p>
+            <p>All cameras are kept for the remaining episodes. The source dataset is unchanged.</p>
+          </details>}
           <dl className="metrics">
             <div><dt>Episodes</dt><dd>{selected.summary.episode_count.toLocaleString()}</dd></div>
             <div><dt>Frames</dt><dd>{selected.summary.frame_count.toLocaleString()}</dd></div>

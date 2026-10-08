@@ -66,9 +66,10 @@ def create_app(projects_dir: Path | None = None, frontend_dir: Path | None = Non
             source = Path(request.source_path).expanduser().resolve()
             if storage.is_relative_to(source):
                 raise ValueError("Project storage must not be inside the source dataset")
-            info = validate_source(source)
+            info, skipped = validate_source(source)
             staging.mkdir(parents=True)
-            summary = import_dataset(source, staging / "dataset", info["codebase_version"])
+            summary = import_dataset(source, staging / "dataset", info["codebase_version"], skipped)
+            skipped_set = set(skipped)
             config = {
                 "id": project_id,
                 "name": request.name,
@@ -78,6 +79,10 @@ def create_app(projects_dir: Path | None = None, frontend_dir: Path | None = Non
                     "source_version": info["codebase_version"],
                     "working_version": "v3.0",
                     "lerobot_commit": LEROBOT_COMMIT,
+                    "skipped_episodes": skipped,
+                    "source_episode_indices": [
+                        index for index in range(info["total_episodes"]) if index not in skipped_set
+                    ],
                 },
                 "summary": summary,
             }

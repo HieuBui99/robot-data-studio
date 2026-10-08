@@ -3,6 +3,7 @@ import json
 import shutil
 from pathlib import Path
 
+import pyarrow.parquet as pq
 import pytest
 from fastapi.testclient import TestClient
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
@@ -59,6 +60,62 @@ def test_import_converts_a_working_copy_without_changing_source(
     assert config["import_info"]["working_version"] == "v3.0"
 
 
+@pytest.mark.parametrize("broken_symlink", [False, True])
+def test_v21_import_skips_missing_camera_episodes_and_reindexes_kept_frames(
+    client: TestClient, source: Path, tmp_path: Path, broken_symlink: bool
+) -> None:
+    incomplete = tmp_path / "incomplete"
+    shutil.copytree(source, incomplete)
+    video = incomplete / "videos/chunk-000/observation.images.cam_wrist_right/episode_000001.mp4"
+    video.unlink()
+    if broken_symlink:
+        video.symlink_to(tmp_path / "missing.mp4")
+    kept_video = incomplete / "videos/chunk-000/observation.images.cam_head/episode_000000.mp4"
+    kept_video.rename(kept_video.with_suffix(".original"))
+    kept_video.symlink_to("episode_000000.original")
+    before = file_hashes(incomplete)
+    response = client.post(
+        "/api/projects", json={"name": "Complete episodes", "source_path": str(incomplete)}
+    )
+    assert response.status_code == 201, response.text
+    project = response.json()
+    assert project["summary"]["episode_count"] == 2
+    assert project["summary"]["frame_count"] == 211
+    assert len(project["summary"]["cameras"]) == 4
+    assert project["summary"]["tasks"] == [
+        "Put the black wrench into the crate.",
+        "Grasp the handle of the crate.",
+    ]
+    assert project["import_info"]["skipped_episodes"] == [1]
+    assert project["import_info"]["source_episode_indices"] == [0, 2]
+    dataset = LeRobotDataset("studio/local", root=project["working_copy"], video_backend="pyav")
+    assert len(dataset.hf_dataset) == 211
+    assert dataset[139]["episode_index"].item() == 1
+    assert dataset[139]["index"].item() == 139
+    assert dataset[139]["frame_index"].item() == 2613
+    assert dataset[139]["timestamp"].item() == 0
+    assert dataset[139]["task"] == "Grasp the handle of the crate."
+    kept_source = pq.read_table(incomplete / "data/chunk-000/episode_000002.parquet")
+    assert dataset[139]["action"].tolist() == kept_source["action"][0].as_py()
+    assert dataset[210]["task"] == "Grasp the handle of the crate."
+    assert dataset.meta.stats["episode_index"]["max"].tolist() == [1]
+    assert dataset.meta.stats["index"]["max"].tolist() == [210]
+    assert file_hashes(incomplete) == before
+
+
+def test_v21_import_rejects_a_dataset_with_no_complete_episodes(
+    client: TestClient, source: Path, tmp_path: Path
+) -> None:
+    incomplete = tmp_path / "no-complete-episodes"
+    shutil.copytree(source, incomplete)
+    for video in incomplete.glob("videos/chunk-000/observation.images.cam_head/*.mp4"):
+        video.unlink()
+    response = client.post("/api/projects", json={"name": "Empty", "source_path": str(incomplete)})
+    assert response.status_code == 400
+    assert "No complete episodes remain" in response.json()["detail"]
+    assert client.get("/api/projects").json() == []
+
+
 def test_v30_copy_can_be_listed_reopened_and_deleted_without_touching_source(
     client: TestClient, source: Path, tmp_path: Path
 ) -> None:
@@ -93,8 +150,6 @@ def test_v30_copy_can_be_listed_reopened_and_deleted_without_touching_source(
         ("missing_info", "meta/info.json"),
         ("bad_json", "meta/info.json"),
         ("unsupported_version", "Unsupported dataset version"),
-        ("missing_video", "cam_wrist_right/episode_000001.mp4"),
-        ("broken_symlink", "cam_wrist_right/episode_000001.mp4"),
         ("unreadable_file", "episode_000001.parquet"),
         ("corrupt_video", "cam_wrist_right/episode_000001.mp4"),
         ("corrupt_data", "episode_000001.parquet"),
@@ -119,10 +174,6 @@ def test_invalid_import_names_problem_and_leaves_no_project(
         info = json.loads(info_path.read_text())
         info["codebase_version"] = "v1.0"
         info_path.write_text(json.dumps(info))
-    elif problem in ("missing_video", "broken_symlink"):
-        video.unlink()
-        if problem == "broken_symlink":
-            video.symlink_to(tmp_path / "missing.mp4")
     elif problem == "unreadable_file":
         data.chmod(0)
     elif problem == "corrupt_video":
